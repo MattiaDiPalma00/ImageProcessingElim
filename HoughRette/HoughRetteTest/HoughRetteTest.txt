@@ -1,0 +1,58 @@
+#include<opencv2/opencv.hpp>
+
+using namespace cv;
+using namespace std;
+
+int main(){
+
+	Mat img = imread("autostrada2.png",IMREAD_GRAYSCALE);
+	
+	imshow("src",img);
+	waitKey(0);
+	
+	Mat gaussian;
+	GaussianBlur(img,gaussian,Size(7,7),2,2);
+	
+	Mat canny;
+	Canny(gaussian,canny,70,120,3);
+
+	imshow("canny",canny);
+	waitKey(0);
+	
+	int dist = hypot(canny.rows,canny.cols);
+	
+	Mat votes = Mat::zeros(dist*2,180,CV_8U);
+	
+	double rho,theta;
+	
+	for(int x = 0 ; x < canny.rows ; x++){
+		for(int y = 0 ; y < canny.cols ; y++){
+			if(canny.at<uchar>(x,y) == 255) {
+				for( theta = 0 ; theta < 180 ; theta++){
+					
+					rho = dist+y*cos((theta-90)*CV_PI/180) + x*sin((theta-90)*CV_PI/180);
+					votes.at<uchar>(rho,theta)++;	
+				}
+			}
+		}
+	}
+	
+	for(int r = 0 ; r < votes.rows ; r++){
+		for(int t = 0 ; t < votes.cols ; t++){
+			if(votes.at<uchar>(r,t) > 60){
+				theta = (t-90)*CV_PI/180;
+				int x = (r-dist)*cos(theta);
+				int y = (r-dist)*sin(theta);
+				
+				Point p1 = Point( cvRound(x+dist*(-sin(theta))), cvRound(y+dist*(cos(theta))));
+				Point p2 = Point( cvRound(x-dist*(-sin(theta))), cvRound(y-dist*(cos(theta))));
+
+				line(img,p1,p2,Scalar(255),2,0);
+			}
+
+		}
+	}
+	
+	imshow("rette",img);
+	waitKey(0);
+}

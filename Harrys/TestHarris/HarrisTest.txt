@@ -1,0 +1,47 @@
+#include<opencv2/opencv.hpp>
+
+using namespace std;
+using namespace cv;
+
+int main(){
+
+	Mat img = imread("blox.jpg",IMREAD_GRAYSCALE);
+	
+	imshow("src",img);
+	waitKey(0);
+
+	Mat dx,dy;
+	Sobel(img,dx,CV_32F,1,0,3);
+	Sobel(img,dy,CV_32F,0,1,3);
+	
+	Mat C00,C11,C10;
+	pow(dx,2,C00);
+	pow(dy,2,C11);
+	multiply(dx,dy,C10);
+	
+	GaussianBlur(C00,C00,Size(7,7),2,0);
+	GaussianBlur(C11,C11,Size(7,7),0,2);
+	GaussianBlur(C10,C10,Size(7,7),2,2);
+	
+	Mat det1,det2,determinante,trace,R;
+	
+	multiply(C00,C11,det1);
+	multiply(C10,C10,det2);
+	pow(C11+C00,2,trace);
+	determinante = det1-det2;
+	R = determinante - 0.04*trace;
+	normalize(R,R,0,255,NORM_MINMAX,CV_32F);
+	
+	for(int i = 0 ; i < R.rows ; i++){
+		for(int j = 0 ; j < R.cols ; j++){
+			if(R.at<float>(i,j) > 100){
+				Point p(j,i);
+				circle(img,p,5,Scalar(255),2,8,0);
+			}
+		}
+	}
+	
+	
+	imshow("src",img);
+	waitKey(0);
+}

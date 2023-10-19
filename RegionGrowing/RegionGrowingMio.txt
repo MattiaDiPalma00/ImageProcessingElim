@@ -1,0 +1,98 @@
+#include<opencv2/opencv.hpp>
+#include <stack>
+
+using namespace cv;
+using namespace std;
+
+const double min_region = 0.01;
+const uchar max_region = 100;
+
+const Point otto[8] {
+	Point(-1,-1),
+	Point(-1,0),	
+	Point(-1,1),	
+	Point(0,-1),
+	Point(0,1),
+	Point(1,-1),	
+	Point(1,0),
+	Point(1,1)					
+};
+
+
+void grow(Mat& img,Mat& out,Mat& mask,Point seed,int th){
+	stack<Point> stack;
+	stack.push(seed);
+	
+	while(!stack.empty()){
+		Point center = stack.top();
+		stack.pop();
+
+	for(int i = 0 ; i < 8 ;++i){
+
+		Point intorno = center + otto[i];
+		
+		if(intorno.x <0 || intorno.x>img.cols-1 ||intorno.y <0 || intorno.y>img.rows-1){
+			continue;
+		}
+		else {
+			int dis = int(pow(img.at<Vec3b>(center)[0] - img.at<Vec3b>(intorno)[0], 2) +
+					pow(img.at<Vec3b>(center)[1] - img.at<Vec3b>(intorno)[1], 2) +
+					pow(img.at<Vec3b>(center)[2] - img.at<Vec3b>(intorno)[2], 2));
+			
+			if(out.at<uchar>(intorno) == 0 && mask.at<uchar>(intorno)== 0  && dis <th){
+				mask.at<uchar>(intorno) = 1;
+				stack.push(intorno) ;
+			}
+			
+		}
+	}
+	
+	}
+	
+}
+
+int main(){
+	
+	Mat img = imread("baboon.jpg",IMREAD_COLOR);
+	//Mat img = imread("Image.png",IMREAD_GRAYSCALE);
+	
+	imshow("src",img);
+	waitKey(0);
+	
+	if (img.rows > 500 || img.cols >500)
+		resize(img,img,Size(0,0),0.5,0.5);
+	
+	int min_region_area = (int)(min_region*img.cols*img.rows);
+	
+	Mat mask = Mat::zeros(img.rows,img.cols,CV_8U);
+	Mat out = Mat::zeros(img.rows,img.cols,CV_8U);
+	
+	uchar padding = 1;
+	
+	for(int x = 0 ; x < img.cols; ++x){
+		for(int y = 0 ; y < img.rows; ++y){
+			
+			if( out.at<uchar>(Point(x,y)) == 0){
+				
+				grow(img,out,mask,Point(x,y),40); //all'aumentare della soglia diminuiscono le regioni evidenziate
+				
+				int sum_mask = (int)sum(mask).val[0];
+				
+				if (sum_mask > min_region_area){
+					
+					out = out+mask*padding;
+					
+					if(++padding > max_region)
+						return -1;
+				}
+				else {out = out+mask *255;}
+				
+				mask = mask - mask;
+			}
+		}
+	}
+	
+	imshow("out",out);
+	waitKey(0);
+
+}

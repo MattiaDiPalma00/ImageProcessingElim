@@ -1,0 +1,110 @@
+#include<opencv2/opencv.hpp>
+#include<stack>
+
+using namespace cv;
+using namespace std;
+
+
+double myDistance(Scalar center,Scalar pixel){
+	return pow(center[0] - pixel[0],2);
+}
+
+void myKmeans(Mat& src,Mat& dst,int N){
+
+	vector<Scalar> centers_colors;
+	vector<vector<Point>> clusters;
+	
+	for(int k = 0 ; k < N ; k++){
+		Point center;
+		center.x = (src.cols/N)*k;
+		center.y = (src.rows/N)*k;
+		
+		Scalar center_color(src.at<uchar>(center));
+		centers_colors.push_back(center_color);
+		vector<Point> t;
+		clusters.push_back(t);
+	}
+	
+	double difference = INFINITY;
+	double oldCenterSum = 0;
+	
+	while(difference > 0.01){
+
+		for(int k = 0 ; k < N ; k++){
+			clusters[k].clear();
+		}
+		
+		for(int x = 0 ; x < src.rows; x++){
+			for(int y = 0 ; y < src.cols; y++){
+				
+				double minDistance = INFINITY;
+				int index = 0;
+				Point point(y,x);
+				Scalar pixel = src.at<uchar>(x,y);
+				
+				for(int k = 0 ; k < N ; k++){
+		
+					Scalar center = centers_colors[k];
+					double dis = myDistance(center,pixel);
+					
+					if (dis < minDistance){
+						minDistance = dis;
+						index = k;
+					}
+				}
+				clusters[index].push_back(point);
+								
+			}
+		}
+		double newCenterSum = 0 ;
+		
+
+		for(int k = 0 ; k < N ; k++){
+			vector<Point> cluster_point = clusters[k];
+			Scalar center = centers_colors[k];
+			double value = 0 , green = 0 , red = 0;
+			for(int i = 0 ; i < cluster_point.size() ; i++){
+				Point pixel = cluster_point[i];
+				value+= src.at<uchar>(pixel);
+
+			}
+			value/= cluster_point.size();
+			
+			Scalar newCenter(value);
+			newCenterSum += myDistance(newCenter,center);
+			centers_colors[k] = newCenter;
+		}
+		
+		newCenterSum/= N;
+		difference = abs(oldCenterSum - newCenterSum);
+		oldCenterSum = newCenterSum;	
+	}
+	
+	for(int k = 0 ; k < N ; k++){
+		vector<Point> cluster_point = clusters[k];
+		Scalar center = centers_colors[k];
+		for(int i = 0 ; i < cluster_point.size() ; i++){
+			Point pixel = cluster_point[i];
+			dst.at<uchar>(pixel) = center[0];
+		
+		}
+	}
+
+}
+
+int main(){
+	
+	Mat img = imread("Image.png",IMREAD_GRAYSCALE);
+	
+	imshow("src",img);
+	waitKey(0);
+	
+	Mat dst(img.rows,img.cols,img.type());
+
+	int N = 10 ;
+	myKmeans(img,dst,N);
+
+	imshow("dst",dst);
+	waitKey(0);
+	
+}

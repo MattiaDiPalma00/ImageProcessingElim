@@ -1,0 +1,105 @@
+#include<opencv2/opencv.hpp>
+
+using namespace cv;
+using namespace std;
+
+double myDistance(Scalar center,Scalar pixel){
+	return pow(center[0] - pixel[0],2)+ 
+		pow(center[1] - pixel[1],2)+ 
+		pow(center[2] - pixel[2],2);
+}
+void myKmeans(Mat& src,Mat& dst,int N){
+	vector<Scalar> centers_colors;
+	vector<vector<Point>> clusters;
+	
+	for(int k = 0 ; k < N ; k++){
+		Point center;
+		center.x = (src.cols/N)*k;
+		center.y = (src.rows/N)*k;
+		Scalar pixel(src.at<Vec3b>(center)[0],src.at<Vec3b>(center)[1],src.at<Vec3b>(center)[2]);
+		centers_colors.push_back(pixel);
+		vector<Point> t;
+		clusters.push_back(t);	
+	}
+	
+	double difference = INFINITY;
+	double oldCenterSum = 0 ;
+		
+	while(difference >0.1){
+		for(int k = 0 ; k < N ; k++){
+			clusters[k].clear();
+		}
+		
+		for(int x = 0 ; x<src.rows ; x++){
+			for(int y = 0 ; y<src.cols ; y++){
+				Point point(y,x);
+				Scalar pixel = src.at<Vec3b>(x,y);
+				double minDistance = INFINITY;
+				int index = 0 ;
+
+				for(int k = 0 ; k < N ; k++){
+					Scalar center = centers_colors[k];
+					double dis = myDistance(center,pixel);
+					
+					if( dis < minDistance){
+						minDistance = dis;
+						index = k;
+					}
+				}
+				clusters[index].push_back(point);	
+			}
+		}
+		double newCenterSum = 0 ;
+		for(int k = 0 ; k < N ; k++){
+			vector<Point> cluster_point = clusters[k];
+			Scalar center = centers_colors[k];
+			double blue = 0, green = 0, red = 0;
+			
+			for(int i = 0 ; i < cluster_point.size() ; i++){
+				Point pixel = cluster_point[i];
+				
+				blue += src.at<Vec3b>(pixel)[0];
+				green += src.at<Vec3b>(pixel)[1];
+				red += src.at<Vec3b>(pixel)[2];
+			}
+			
+			blue /= cluster_point.size() ;
+			green /= cluster_point.size() ;
+			red /= cluster_point.size() ;
+			Scalar newCenter(blue,green,red);
+			newCenterSum += myDistance(newCenter,center);
+			centers_colors[k] = newCenter;
+		}
+		newCenterSum/= N;
+		difference = abs(oldCenterSum - newCenterSum);
+		oldCenterSum = newCenterSum;	
+	}
+	
+	for(int k = 0 ; k < N ; k++){
+		vector<Point> cluster_point = clusters[k];
+		Scalar center = centers_colors[k];
+					
+		for(int i = 0 ; i < cluster_point.size() ; i++){
+			Point pixel = cluster_point[i];			
+			dst.at<Vec3b>(pixel)[0] = center[0];
+			dst.at<Vec3b>(pixel)[1]= center[1];
+			dst.at<Vec3b>(pixel)[2]= center[2];
+		}
+	}
+	
+	imshow("kmeans",dst);
+	waitKey(0);
+}
+
+int main(){
+
+	Mat img = imread("verdura.png",IMREAD_COLOR);
+	
+	imshow("src",img);
+	waitKey(0);
+	
+	Mat dst(img.rows,img.cols,img.type());
+	
+	int N = 10 ;
+	myKmeans(img,dst,N);
+}

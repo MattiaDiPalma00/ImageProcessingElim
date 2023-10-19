@@ -1,0 +1,78 @@
+#include <opencv2/opencv.hpp>
+
+using namespace std;
+using namespace cv;
+
+int main(){
+
+	Mat img = imread("coins.jpg",IMREAD_GRAYSCALE);
+	
+	imshow("src",img);
+	waitKey(0);
+	
+	GaussianBlur(img,img,Size(3,3),0,0); //ricorda 0 0 finale
+	
+	/*anche le soglie di canny vanno settate in base all'immagine 
+	soglie troppo basse esaltano edge che non esistono 
+	soglie troppo alte non esaltano edge che esistono 
+	*/
+	Mat canny;
+	Canny(img,canny,70,130,3);
+
+	imshow("canny",canny);
+	waitKey(0);
+	
+	/*a seconda dell'immagine di input va settato il range dei raggi 
+	se hai cerchi piccoli prendi r_min e r_max piu piccoli 
+	se hai cerchi grandi allora aumenta il raggio 
+	*/
+	int r_min = 20 ; //raggio min
+	int r_max = 60 ; //raggio max
+		
+	int size[] = {canny.rows, canny.cols, r_max-r_min +1};
+
+	Mat votes = Mat(3,size,CV_32F,Scalar(0)); //spazio parametrico 3 dimensioni
+	
+	for(int x = 0 ; x < canny.rows; x++){
+		for(int y = 0 ; y < canny.cols; y++){
+			if (canny.at<uchar>(x,y) == 255){
+				for(int r = r_min; r<= r_max; r++){
+					for(int theta = 0; theta< 360; theta++){
+						int a = y-r* cos(theta* CV_PI/180);
+						int b = x-r* sin(theta* CV_PI/180);
+						
+						if(a >=0 && a<canny.cols && b>=0 && b< canny.rows)
+							votes.at<float>(b,a,r-r_min)++;
+					
+					}
+				}
+			}
+		}
+	}
+	
+	//fai attenzione che sulle rette si analizza il voto 
+	//scorrendo votes mentre qua scorri canny 
+	for(int r = r_min; r<= r_max; r++){
+		for(int b = 0; b< canny.rows; b++){
+			for(int a = 0; a< canny.cols; a++){
+				/* Il valore soglia deve essere settato in base all'immagine 
+				se la soglia è troppo alta non prenderà dei cerchi se è troppo bassa
+				evidenzia cerchi non precisi
+				*/
+				if (votes.at<float>(b,a,r-r_min) > 130){
+					
+					//disegno il centro della circonferenza
+					circle(img,Point(a,b),3,Scalar(0),2,8,0);
+					//disegno la circonferenza
+					circle(img,Point(a,b),r,Scalar(0),2,8,0);
+					
+				}
+		
+			}
+		}
+	}
+	
+	imshow("houghmio",img);
+	waitKey(0);
+
+}

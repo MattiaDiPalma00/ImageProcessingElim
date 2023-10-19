@@ -1,0 +1,84 @@
+#include <opencv2/opencv.hpp>
+
+using namespace cv;
+using namespace std;
+
+void nonMaxSupp(Mat& magn,Mat& orient,Mat& nms){
+	for(int i = 0 ; i < magn.rows ; i++){
+		for(int j = 0 ; j < magn.cols ; j++){
+			float angle = orient.at<float>(i,j);
+			if(angle > 180)
+				angle-= 360;
+			
+			if( (-22.5 < angle && angle < 22.5) || (-157.5 < angle && angle <157.5) ){
+				if(magn.at<uchar>(i,j) >= magn.at<uchar>(i,j-1) && magn.at<uchar>(i,j) >= magn.at<uchar>(i,j+1))
+					nms.at<uchar>(i,j) = magn.at<uchar>(i,j);
+			}
+			if( (-67.5 < angle && angle < -22.5) || (112.5 < angle && angle <157.5) ){
+				if(magn.at<uchar>(i,j) >= magn.at<uchar>(i-1,j-1) && magn.at<uchar>(i,j) >= magn.at<uchar>(i+1,j+1))
+					nms.at<uchar>(i,j) = magn.at<uchar>(i,j);
+			}    
+			if( (-112.5 < angle && angle < -67.5) || (67.5 < angle && angle <112.5) ){
+				if(magn.at<uchar>(i,j) >= magn.at<uchar>(i-1,j) && magn.at<uchar>(i,j) >= magn.at<uchar>(i+1,j))
+					nms.at<uchar>(i,j) = magn.at<uchar>(i,j);
+			} 
+			if( (-157.5 < angle && angle < -112.5) || (22.5 < angle && angle <67.5) ){
+				if(magn.at<uchar>(i,j) >= magn.at<uchar>(i-1,j+1) && magn.at<uchar>(i,j) >= magn.at<uchar>(i+1,j-1))
+					nms.at<uchar>(i,j) = magn.at<uchar>(i,j);
+			} 
+		}
+	}
+}
+
+void threshold(Mat& nms,Mat& out,int lt,int ht){
+	for(int i = 0 ; i < nms.rows ; i++){
+		for(int j = 0 ;  j < nms.cols ; j++){
+			if(nms.at<uchar>(i,j) < lt){
+				out.at<uchar>(i,j) = 0 ;
+			}
+			else if(nms.at<uchar>(i,j) > ht){
+				out.at<uchar>(i,j) = 255 ;
+			}
+			else if(nms.at<uchar>(i,j) > lt && nms.at<uchar>(i,j) < ht){
+				for(int u = -1 ; u <= 1; u++){
+					for(int v = -1 ; v <= 1; v++){
+						if(nms.at<uchar>(i+u,j+v) > ht)
+							out.at<uchar>(i+u,j+v) = 255 ;
+					}		
+				}
+			}
+		}	
+	}
+
+	imshow("canny",out);
+	waitKey(0);
+}
+int main(){
+
+	Mat img = imread("building.png",IMREAD_GRAYSCALE);
+	
+	imshow("src",img);
+	waitKey(0);
+	
+	Mat gaussian;
+	GaussianBlur(img,gaussian,Size(5,5),0,0);
+	
+	Mat dx,dy;
+	Sobel(gaussian,dx,CV_32F,1,0,3);
+	Sobel(gaussian,dy,CV_32F,0,1,3);
+	
+	Mat dx2,dy2,magn,orient;
+	pow(dx,2,dx2);
+	pow(dy,2,dy2);
+	sqrt(dx2+dy2,magn);
+	
+	normalize(magn,magn,0,255,NORM_MINMAX,CV_8U);
+	
+	phase(dx,dy,orient,true);
+	
+	Mat nms = Mat::zeros(magn.rows,magn.cols,CV_8U);
+	nonMaxSupp(magn,orient,nms);
+	
+	Mat out = Mat::zeros(magn.rows,magn.cols,CV_8U);
+	threshold(nms,out,50,80);
+}

@@ -1,0 +1,130 @@
+#include <iostream>
+#include <opencv2/opencv.hpp>
+
+using namespace cv;
+using namespace std;
+
+void myKmeans (Mat &src, Mat &dst, int nClusters);
+
+int main() {
+    Mat image = imread("Image.png", IMREAD_COLOR);
+    if(image.empty()){
+        return -1;
+    }
+    namedWindow("image", WINDOW_AUTOSIZE);
+    imshow("image",image);
+    waitKey(0);
+    destroyWindow("image");
+
+    int nClusters = 3;
+
+    Mat dst(image.rows, image.cols, image.type());
+    myKmeans (image, dst, nClusters);
+    imshow ("K-Means", dst);
+    waitKey(0);
+    return 0;
+}
+
+double myDistance(Scalar p1, Scalar p2){
+    return pow (p1[0] - p2[0], 2) +
+           pow (p1[1] - p2[1], 2) +
+           pow (p1[2] - p2[2], 2);
+}
+
+void myKmeans (Mat &src, Mat &dst, int nClusters){
+
+    vector<Scalar> centers_colors;
+    vector<vector<Point>> clusters;
+
+    // 1) Calcolo i centri iniziali per i k cluster
+    for (int k=0; k < nClusters; k++){
+        Point center;
+        center.x = (src.cols/nClusters)*k; // K-MEANS++
+        center.y = (src.rows/nClusters)*k; // Si potrebbero prendere i centri in maniera diversa
+
+        Scalar center_colors(src.at<Vec3b>(center)[0], src.at<Vec3b>(center)[1], src.at<Vec3b>(center)[2]);
+
+        centers_colors.push_back(center_colors); //memorizzo i centroidi
+        vector<Point> t; // contiene i pixel assegnati al cluster k 
+        clusters.push_back(t); //è un array di array per i k cluster con i Point che fanno parte di quel cluster 
+    }
+	
+    // 2) Assegno i pixel ai cluster, ricalcolo i centri usando le medie, fino a che differenza < 0.1 (soglia)
+    double oldCenterSum = 0;
+    double difference = INFINITY;
+    
+    while (difference > 0.1){ // finche la differenza non è maggiore di una soglia 
+        for (int k=0; k < nClusters; k++){
+            clusters[k].clear(); // riazzero il mio cluster per le nuove assegnazioni
+        }
+
+        // 2.1) Aggiorno i pixels nei clusters
+        for (int x=0; x < src.rows; x++){
+            for (int y=0; y < src.cols; y++){
+                // Calcolo le distanze da ogni centro dei cluster e posiziono il pixel nel cluster più vicino
+                double minDistance = INFINITY;
+                int clusterIndex = 0;
+
+                Point point(y,x); // tiro fuori il punto che inserirai nel cluster
+		
+		Scalar pixel = src.at<Vec3b>(x,y); // tiro fuori il pixel 
+
+                for (int k=0; k < nClusters; k++){
+
+                    Scalar center = centers_colors[k]; //mi prendo il centro dall'array alla posizione k
+
+                   
+                    double distance = myDistance(center,pixel);
+                    if (distance < minDistance){
+                        minDistance = distance;
+                        clusterIndex = k; // Salvo il pixel nel cluster di indice k
+                    }
+                }
+                clusters[clusterIndex].push_back(point); //salvo nel cluster (array di array)
+            }
+        }
+        // 2.2) Calcolo la media di ogni cluster
+        double newCenterSum = 0;
+        for (int k=0; k < nClusters; k++){
+		
+            vector<Point> clusterPoints = clusters[k]; //mi salvo i punti apparteneti al k-esimo cluster 
+            double blue=0, green=0 , red=0;
+           
+            for (int i=0; i < clusterPoints.size(); i++){
+                Point pixel = clusterPoints[i];
+                blue += src.at<Vec3b>(pixel)[0];
+                green += src.at<Vec3b>(pixel)[1];
+                red += src.at<Vec3b>(pixel)[2];
+            }
+            // Calcolo media dei colori del nuovo centro
+            blue /= clusterPoints.size();
+            green /= clusterPoints.size();
+            red /= clusterPoints.size();
+
+            //Calcolo la distanza del nuovo centro dal vecchio e aggiungo a newCenterSum
+            Scalar center = centers_colors[k];
+            Scalar newCenter(blue, green, red);
+            newCenterSum += myDistance(newCenter,center);
+            // Aggiorno il nuovo centro
+            centers_colors[k] = newCenter;
+        }
+
+	// lo fai per capire se le medie si stanno ancora spostando lo fai fino ad una certa soglia 
+        newCenterSum /= nClusters;
+        difference = abs(oldCenterSum - newCenterSum); //valore assoluto della differenza tra i due centri
+    
+        oldCenterSum = newCenterSum;
+    }
+    // 3. Disegno l'immagine di output
+    for (int k=0; k < nClusters; k++){
+        vector<Point> clusterPoints = clusters[k]; //prendi il vettore di punti del cluster k
+        Scalar center = centers_colors[k]; //prendi il centro del k-esimo cluster
+        for (int i=0; i < clusterPoints.size(); i++){
+            // Assegno il valore del centro agli altri pixel del cluster
+            Point pixel = clusterPoints[i];
+            dst.at<Vec3b>(pixel)[0] = center[0];
+            dst.at<Vec3b>(pixel)[1] = center[1];
+            dst.at<Vec3b>(pixel)[2] = center[2];
+        }
+    }
+}
